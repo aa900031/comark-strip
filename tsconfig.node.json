@@ -1,0 +1,16 @@
+{
+	"extends": "@tsconfig/node24/tsconfig.json",
+	"compilerOptions": {
+		"composite": false,
+		"module": "ESNext",
+		"moduleResolution": "Bundler",
+		"types": [
+			"node"
+		],
+		"declaration": false
+	},
+	"include": [
+		"tsdown.config.ts",
+		"vitest.config.ts"
+	]
+}

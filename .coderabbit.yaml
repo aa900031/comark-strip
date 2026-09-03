@@ -1,0 +1,8 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: en-US
+reviews:
+  tools:
+    markdownlint:
+      enabled: false
+    eslint:
+      enabled: false

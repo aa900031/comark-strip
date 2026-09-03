@@ -1,0 +1,48 @@
+{
+	"name": "comark-strip",
+	"type": "module",
+	"version": "0.0.0",
+	"packageManager": "pnpm@11.24.0",
+	"author": "zhong666 <hi@zhong666.me>",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/aa900031/comark-strip"
+	},
+	"keywords": [
+		"comark",
+		"comark-plugin",
+		"markdown"
+	],
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"build": "tsdown",
+		"release": "release-it",
+		"lint": "eslint .",
+		"test": "vitest run",
+		"typecheck": "tsc --noEmit"
+	},
+	"peerDependencies": {
+    "comark": ">=0.4.0"
+  },
+	"engines": {
+    "node": ">=20"
+  },
+	"devDependencies": {
+		"@aa900031/eslint-config": "^8.0.3",
+		"@aa900031/release-it-config": "^1.0.0",
+		"@aa900031/tsdown-config": "^0.2.2",
+		"@codspeed/vitest-plugin": "^5.7.1",
+		"@tsconfig/node24": "^24.0.5",
+		"@types/node": "^24.13.3",
+		"@vitest/coverage-istanbul": "^4.1.11",
+		"comark": "^0.6.2",
+		"eslint": "^10.9.1",
+		"release-it": "^20.2.1",
+		"tsdown": "^0.22.0",
+		"typescript": "~5.9.3",
+		"vitest": "^4.1.11"
+	}
+}
