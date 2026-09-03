@@ -14,9 +14,19 @@
 		"comark-plugin",
 		"markdown"
 	],
+	"exports": {
+		".": "./src/index.ts",
+		"./package.json": "./package.json"
+	},
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.cts",
 	"files": [
 		"dist"
 	],
+	"engines": {
+		"node": ">=20"
+	},
 	"scripts": {
 		"build": "tsdown",
 		"release": "release-it",
@@ -25,11 +35,8 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"peerDependencies": {
-    "comark": ">=0.4.0"
-  },
-	"engines": {
-    "node": ">=20"
-  },
+		"comark": ">=0.4.0"
+	},
 	"devDependencies": {
 		"@aa900031/eslint-config": "^8.0.3",
 		"@aa900031/release-it-config": "^1.0.0",
@@ -44,5 +51,21 @@
 		"tsdown": "^0.22.0",
 		"typescript": "~5.9.3",
 		"vitest": "^4.1.11"
+	},
+	"publishConfig": {
+		"access": "public",
+		"exports": {
+			".": {
+				"import": {
+					"types": "./dist/index.d.ts",
+					"default": "./dist/index.js"
+				},
+				"require": {
+					"types": "./dist/index.d.cts",
+					"default": "./dist/index.cjs"
+				}
+			},
+			"./package.json": "./package.json"
+		}
 	}
 }
