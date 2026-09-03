@@ -9,7 +9,7 @@
 
 ## Features
 
-- Removes `pre`, `hr`, `table`, block HTML, comments and footnotes, including their content
+- Removes `pre`, `hr`, `table`, frontmatter, block HTML, comments and footnotes, including their content
 - Renders everything else as simple paragraphs without formatting
 - Uses `alt` (or `title`) text for images
 - Unknown nodes (e.g. your own components) are kept, but their children are stripped
@@ -58,6 +58,16 @@ strip({
 ```
 
 A `Handler` receives the node (`[tag, attrs, ...children]`) and returns a node, an array of nodes, or nothing to remove it.
+
+When using footnotes, register `footnotes()` before `strip()`:
+
+```ts
+import footnotes from 'comark/plugins/footnotes'
+
+const doc = await parseMarkdown(markdown, {
+	plugins: [footnotes(), strip()],
+})
+```
 
 ## Development
 

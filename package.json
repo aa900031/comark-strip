@@ -35,7 +35,7 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"peerDependencies": {
-		"comark": ">=0.4.0"
+		"comark": ">=0.6.0"
 	},
 	"devDependencies": {
 		"@aa900031/eslint-config": "^8.0.3",

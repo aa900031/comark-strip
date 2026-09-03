@@ -18,11 +18,12 @@ describe('strip', () => {
 			meta: {},
 		}
 		strip().post!({
+			// eslint-disable-next-line ts/ban-ts-comment
 			// @ts-expect-error
 			tree,
 			markdown: '',
 			options: {},
-			tokens: []
+			tokens: [],
 		})
 		expect(tree.nodes).toEqual([['x', {}, 'value', ['y', {}, 'with value']]])
 	})
@@ -69,6 +70,14 @@ describe('strip', () => {
 
 	it('should support a paragraph', async () => {
 		expect(await process('Hello.\n\nWorld.')).toBe('Hello.\n\nWorld.')
+	})
+
+	it('should remove YAML frontmatter', async () => {
+		expect(await process('---\ntitle: Hello\n---\n\nHello')).toBe('Hello')
+	})
+
+	it('should remove TOML frontmatter', async () => {
+		expect(await process('+++\ntitle = "Hello"\n+++\n\nHello')).toBe('Hello')
 	})
 
 	it('should support a heading (atx)', async () => {
@@ -127,6 +136,10 @@ describe('strip', () => {
 		expect(await process('| A | B |\n| - | - |\n| C | D |')).toBe('')
 	})
 
+	it('should remove task list checkboxes', async () => {
+		expect(await process('- [ ] todo\n- [x] done')).toBe('todo\n\ndone')
+	})
+
 	it('should support code (indented)', async () => {
 		expect(await process('\talert("hello");')).toBe('')
 	})
@@ -147,6 +160,14 @@ describe('strip', () => {
 		expect(await process('<!-- Hello -->')).toBe('')
 	})
 
+	it('should remove inline html comments', async () => {
+		expect(await process('before <!-- hidden --> after')).toBe('before  after')
+	})
+
+	it('should remove trailing text from block html', async () => {
+		expect(await process('<div>inside</div>tail')).toBe('')
+	})
+
 	it('should support html in an image', async () => {
 		expect(await process('[<img src="http://example.com/a.jpg" />](http://example.com)')).toBe('')
 	})
@@ -161,6 +182,10 @@ describe('strip', () => {
 
 	it('should support keeping lists', async () => {
 		expect(await process('- **Hello**\n\n- World!', { keep: ['ul', 'li'] })).toBe('- Hello\n- World!')
+	})
+
+	it('should keep task list checkboxes when keeping lists', async () => {
+		expect(await process('- [ ] todo\n- [x] done', { keep: ['ul', 'li'] })).toBe('- [ ] todo\n- [x] done')
 	})
 
 	it('should throw for unknown nodes in `keep` w/o handlers', async () => {

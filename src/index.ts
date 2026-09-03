@@ -13,6 +13,9 @@ export interface Options {
 
 type Handlers = Record<string, Handler>
 
+const TOML_FRONTMATTER_RE = /^\+\+\+\r?\n(?:[\s\S]*?\r?\n)?\+\+\+(?:\r?\n|$)/
+const HTML_COMMENT_RE = /^<!--[\s\S]*?-->$/
+
 /**
  * Modifiers for known tags. Tags not listed here are not changed (but their children are).
  * Raw HTML elements are looked up under the pseudo-tag `html`.
@@ -33,6 +36,7 @@ const defaults: Handlers = {
 	hr: empty,
 	html,
 	img: image,
+	input: taskInput,
 	li: block,
 	ol: children,
 	pre: empty,
@@ -47,14 +51,18 @@ const defaults: Handlers = {
 /**
  * Remove markdown formatting.
  *
- * - remove `pre`, `hr`, `table`, block html, footnotes and their content
+ * - remove `pre`, `hr`, `table`, frontmatter, block html, footnotes and their content
  * - render everything else as simple paragraphs without formatting
  * - uses `alt` text for images
  */
 export default defineComarkPlugin<Options | null | undefined>((options) => {
-	const handlers: Handlers = { ...defaults }
 	const keep = options?.keep || []
 	const remove = options?.remove || []
+	const handlers: Handlers = { ...defaults }
+
+	// A kept `li` still needs its internal checkbox for Comark's list renderer.
+	if (keep.includes('li'))
+		handlers.input = node => node
 
 	for (const value of remove) {
 		if (typeof value === 'string')
@@ -77,6 +85,8 @@ export default defineComarkPlugin<Options | null | undefined>((options) => {
 		}
 	}
 
+	const stripHtml = map.html === html || map.html === empty
+
 	function one(node: Node): Node | Node[] | undefined {
 		if (typeof node === 'string')
 			return node
@@ -98,12 +108,15 @@ export default defineComarkPlugin<Options | null | undefined>((options) => {
 
 	function all(nodes: Node[]): Node[] {
 		const result: Node[] = []
-		for (const node of nodes) {
+		for (let index = 0; index < nodes.length; index++) {
+			const node = nodes[index]!
 			const value = one(node)
 			if (Array.isArray(value) && !isElement(value))
 				result.push(...value)
 			else if (value)
 				result.push(value)
+			else if (isTaskInput(node) && typeof nodes[index + 1] === 'string')
+				nodes[index + 1] = (nodes[index + 1] as string).replace(/^ /, '')
 		}
 		return clean(result)
 	}
@@ -113,13 +126,30 @@ export default defineComarkPlugin<Options | null | undefined>((options) => {
 		markdownItPlugins: [
 			(md) => {
 				// Link reference definitions produce an empty `component` node in comark; drop them.
-				md.core.ruler.push('strip-reference', (state) => {
-					state.tokens = state.tokens.filter(token => token.type !== 'reference')
+				md.core.ruler.push('strip-reference', (state: any) => {
+					state.tokens = state.tokens.filter((token: any) => token.type !== 'reference')
 				})
+				if (stripHtml) {
+					md.core.ruler.push('strip-html', (state: any) => {
+						state.tokens = state.tokens.filter((token: any) => token.type !== 'html_block')
+						for (const token of state.tokens) {
+							if (token.type === 'inline' && token.children)
+								token.children = token.children.filter((token: any) => !isHtmlComment(token))
+						}
+					})
+				}
 			},
 		],
+		pre(state) {
+			const match = TOML_FRONTMATTER_RE.exec(state.markdown)
+			if (match) {
+				state.markdown = state.markdown.slice(match[0].length)
+				state.parsedLines = (state.parsedLines || 0) + match[0].split(/\r?\n/).length - 1
+			}
+		},
 		post(state) {
 			state.tree.nodes = all(state.tree.nodes)
+			state.tree.frontmatter = {}
 		},
 	}
 })
@@ -162,6 +192,21 @@ function block(node: ElementNode | CommentNode): Node[] | ElementNode {
 function image(node: ElementNode | CommentNode): Node | undefined {
 	const value = String(node[1].alt || node[1].title || '')
 	return value || undefined
+}
+
+function taskInput(node: ElementNode | CommentNode): Node | undefined {
+	return isTaskInput(node) ? undefined : node
+}
+
+function isTaskInput(node: Node): node is ElementNode {
+	return Array.isArray(node)
+		&& node[0] === 'input'
+		&& node[1].class === 'task-list-item-checkbox'
+		&& node[1].type === 'checkbox'
+}
+
+function isHtmlComment(token: { type: string, content?: string }): boolean {
+	return token.type === 'html_inline' && HTML_COMMENT_RE.test(token.content?.trim() || '')
 }
 
 /** Inline html keeps its text, block html (and comments) is removed. */
