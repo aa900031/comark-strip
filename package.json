@@ -17,6 +17,9 @@
 	"files": [
 		"dist"
 	],
+	"engines": {
+		"node": ">=20"
+	},
 	"scripts": {
 		"build": "tsdown",
 		"release": "release-it",
@@ -25,11 +28,8 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"peerDependencies": {
-    "comark": ">=0.4.0"
-  },
-	"engines": {
-    "node": ">=20"
-  },
+		"comark": ">=0.4.0"
+	},
 	"devDependencies": {
 		"@aa900031/eslint-config": "^8.0.3",
 		"@aa900031/release-it-config": "^1.0.0",
