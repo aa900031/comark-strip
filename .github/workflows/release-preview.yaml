@@ -1,0 +1,30 @@
+name: Release Preview
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  publish-pkg-pr-new:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup
+        uses: aa900031/github-actions/setup-node@main
+        with:
+          no-turbo-cache: 'true'
+
+      - name: Build packages
+        run: pnpm run build
+
+      - name: Publish to pkg.pr.new
+        run: pnpx pkg-pr-new publish --pnpm --compact

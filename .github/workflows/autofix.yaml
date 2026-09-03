@@ -1,0 +1,31 @@
+name: autofix.ci
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  autofix-eslint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup
+        uses: aa900031/github-actions/setup-node@main
+        with:
+          no-turbo-cache: 'true'
+
+      - name: Fix lint issue
+        run: pnpm run lint --fix
+
+      - uses: autofix-ci/action@7a166d7532b277f34e16238930461bf77f9d7ed8
+        with:
+          commit-message: 'chore: apply automated updates'
