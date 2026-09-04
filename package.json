@@ -32,7 +32,7 @@
 		"release": "release-it",
 		"lint": "eslint .",
 		"test": "vitest run",
-		"typecheck": "tsc -b --noEmit"
+		"typecheck": "tsc --noEmit"
 	},
 	"peerDependencies": {
 		"comark": ">=0.6.0"

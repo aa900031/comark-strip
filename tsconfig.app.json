@@ -1,11 +1,10 @@
 {
 	"compilerOptions": {
 		"composite": true,
+		"tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
 		"target": "ESNext",
 		"jsx": "preserve",
 		"lib": [
-			"DOM",
-			"DOM.Iterable",
 			"ESNext"
 		],
 		"useDefineForClassFields": true,
