@@ -32,7 +32,7 @@
 		"release": "release-it",
 		"lint": "eslint .",
 		"test": "vitest run",
-		"typecheck": "tsc --noEmit"
+		"typecheck": "tsc -b --noEmit"
 	},
 	"peerDependencies": {
 		"comark": ">=0.6.0"
@@ -41,7 +41,6 @@
 		"@aa900031/eslint-config": "^8.0.3",
 		"@aa900031/release-it-config": "^1.0.0",
 		"@aa900031/tsdown-config": "^0.2.2",
-		"@codspeed/vitest-plugin": "^5.7.1",
 		"@tsconfig/node24": "^24.0.5",
 		"@types/node": "^24.13.3",
 		"@vitest/coverage-istanbul": "^4.1.11",

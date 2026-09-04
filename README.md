@@ -42,7 +42,9 @@ console.log(await renderMarkdown(doc))
 ## Options
 
 Same as strip-markdown, but keyed by comark tag name instead of mdast node type.
-Raw HTML elements are matched by the pseudo tag `html`.
+Pseudo tags: raw HTML elements are matched by `html`, plain text by `text`, and
+frontmatter by `yaml` / `toml` (frontmatter is never a tree node, so a `remove`
+handler for `yaml`/`toml` never fires — `keep` and plain `remove` work).
 
 - `keep` (`string[]`, optional) — tag names to leave unchanged, e.g. `['ul', 'li']`
 - `remove` (`Array<string | [string, Handler]>`, optional) — tag names to remove, or replace with a handler

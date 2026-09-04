@@ -1,6 +1,6 @@
 import type { Node } from 'comark'
 import type { Handler, Options } from './index'
-import { parseMarkdown } from 'comark'
+import { createMarkdownParser, parseMarkdown } from 'comark'
 import footnotes from 'comark/plugins/footnotes'
 import { renderMarkdown } from 'comark/render'
 import { describe, expect, it } from 'vitest'
@@ -196,6 +196,73 @@ describe('strip', () => {
 
 	it('should support `options.remove`', async () => {
 		expect(await process('I read this :cite[smith04]!', { remove: ['cite'] })).toBe('I read this !')
+	})
+
+	it('should not leave empty paragraphs behind', async () => {
+		expect(await process('a\n\n> <!-- c -->\n\nb')).toBe('a\n\nb')
+	})
+
+	it('should strip paragraph attributes', async () => {
+		expect(await process('Hello world {#foo .red}')).toBe('Hello world')
+	})
+
+	it('should treat `remove: [\'html\']` like the default', async () => {
+		// In strip-markdown, remove: ['html'] equals the default: inline text survives.
+		expect(await process('a <sup>Hello</sup> b', { remove: ['html'] })).toBe('a Hello b')
+	})
+
+	it('should remove inline comments with a custom `html` handler', async () => {
+		expect(await process('before <!-- hidden --> after', { remove: [['html', () => undefined]] })).toBe('before  after')
+	})
+
+	it('should support `text` handlers', async () => {
+		expect(await process('Alfred', { remove: [['text', () => 'Batman']] })).toBe('Batman')
+	})
+
+	it('should ignore non-function handlers', async () => {
+		// strip-markdown skips falsy handlers instead of crashing.
+		// eslint-disable-next-line ts/ban-ts-comment
+		// @ts-expect-error
+		expect(await process('*x*', { remove: [['em', undefined]] })).toBe('*x*')
+	})
+
+	it('should support keeping YAML frontmatter', async () => {
+		expect(await process('---\ntitle: Hello\n---\n\nHello', { keep: ['yaml'] })).toContain('title: Hello')
+	})
+
+	it('should support keeping TOML frontmatter', async () => {
+		expect(await process('+++\ntitle = "Hello"\n+++\n\nHello', { keep: ['toml'] })).toContain('title = "Hello"')
+	})
+
+	it('should remove TOML frontmatter with trailing whitespace on fences', async () => {
+		expect(await process('+++ \ntitle = "Hello"\n+++ \n\nHello')).toBe('Hello')
+	})
+
+	it('should keep user nodes with footnote-like classes', async () => {
+		expect(await process('a :sup[1]{class="footnote-x"} b')).toContain('1')
+	})
+
+	it('should not strip TOML-looking blocks mid-document when streaming', async () => {
+		const parse = createMarkdownParser({ plugins: [strip()] })
+		const doc1 = await parse('para\n\n+++\nnot frontmatter\n+++', { streaming: true })
+		expect(JSON.stringify(doc1.nodes)).toContain('not frontmatter')
+		const doc2 = await parse('para\n\n+++\nnot frontmatter\n+++\n\nappended', { streaming: true })
+		expect(JSON.stringify(doc2.nodes)).toContain('not frontmatter')
+	})
+
+	it('should apply custom handlers once per node when streaming', async () => {
+		const parse = createMarkdownParser({
+			plugins: [strip({ remove: [['em', (node) => {
+				node[2] = `X${node[2]}`
+				return node
+			}]] })],
+		})
+		const full = 'aaa *bbb*\n\nccc *ddd*\n\neee *fff*\n'
+		let doc
+		for (let index = 8; index <= full.length; index += 8)
+			doc = await parse(full.slice(0, index), { streaming: true })
+		doc = await parse(full, { streaming: true })
+		expect(JSON.stringify(doc!.nodes)).not.toContain('XX')
 	})
 
 	it('should support callbacks in `remove`', async () => {
