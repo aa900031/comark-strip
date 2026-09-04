@@ -39,7 +39,7 @@ importers:
         specifier: ^20.2.1
         version: 20.2.1(@types/node@24.13.3)(magicast@0.5.4)(supports-color@7.2.0)
       tsdown:
-        specifier: ^0.22.0
+        specifier: ^0.22.14
         version: 0.22.14(typescript@5.9.3)
       typescript:
         specifier: ~5.9.3
