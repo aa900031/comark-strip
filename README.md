@@ -49,6 +49,8 @@ handler for `yaml`/`toml` never fires — `keep` and plain `remove` work).
 - `keep` (`string[]`, optional) — tag names to leave unchanged, e.g. `['ul', 'li']`
 - `remove` (`Array<string | [string, Handler]>`, optional) — tag names to remove, or replace with a handler
 
+Fenced code is a `pre` with an inner `code`; to keep fences intact use `keep: ['pre', 'code']`.
+
 ```ts
 strip({
 	keep: ['ul', 'li'],
@@ -61,13 +63,15 @@ strip({
 
 A `Handler` receives the node (`[tag, attrs, ...children]`) and returns a node, an array of nodes, or nothing to remove it.
 
-When using footnotes, register `footnotes()` before `strip()`:
+Plugins run in registration order. Register plugins that transform the tree,
+such as `footnotes()` and `alert()`, before `strip()`:
 
 ```ts
+import alert from 'comark/plugins/alert'
 import footnotes from 'comark/plugins/footnotes'
 
 const doc = await parseMarkdown(markdown, {
-	plugins: [footnotes(), strip()],
+	plugins: [alert(), footnotes(), strip()],
 })
 ```
 

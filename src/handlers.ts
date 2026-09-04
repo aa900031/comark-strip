@@ -6,7 +6,7 @@ import type { CommentNode, ElementNode, Node } from 'comark'
  * for comments, and a plain string for `text` handlers (as in strip-markdown,
  * the parameter is deliberately untyped).
  */
-export type Handler = (node: any) => Node[] | Node | null | undefined
+export type Handler = (node: any) => Node[] | Node | null | undefined | void
 
 type Handlers = Record<string, Handler>
 
@@ -33,6 +33,7 @@ const defaults: Handlers = {
 	s: children,
 	section: footnote,
 	strong: children,
+	sub: children,
 	sup: footnote,
 	table: empty,
 	text: node => node,
@@ -56,30 +57,23 @@ export function createHandlers(
 			handlers[value[0]] = value[1]
 	}
 
-	if (keep.length === 0)
-		return handlers
-
-	const map: Handlers = {}
-	for (const key in handlers) {
-		if (!keep.includes(key))
-			map[key] = handlers[key]!
-	}
-	for (const key of keep) {
+	for (const key of new Set(keep)) {
 		if (!Object.hasOwn(handlers, key))
 			throw new Error(`Unknown node type \`${key}\` in \`keep\`, use a replace tuple with a handle instead: \`remove: [['${key}', handle]]\``)
+		delete handlers[key]
 	}
-	return map
+	return handlers
 }
 
-export function isElement(value: Node | Node[]): value is ElementNode | CommentNode {
-	return typeof value[1] === 'object' && value[1] !== null && !Array.isArray(value[1])
+export function isElement(value: unknown): value is ElementNode | CommentNode {
+	return Array.isArray(value) && typeof value[1] === 'object' && value[1] !== null && !Array.isArray(value[1])
 }
 
 export function children(node: ElementNode | CommentNode): Node[] {
 	return node.slice(2) as Node[]
 }
 
-export function paragraph(node: ElementNode | CommentNode): ElementNode {
+function paragraph(node: ElementNode | CommentNode): ElementNode {
 	// Carry `$` (position meta) through so comark's streaming reuse keeps its anchor.
 	return ['p', node[1].$ ? { $: node[1].$ } : {}, ...children(node)]
 }
@@ -113,10 +107,10 @@ function listItem(node: ElementNode | CommentNode): Node[] | ElementNode {
 	return block(node)
 }
 
-/** `sup.footnote-ref` / `section.footnotes` from `comark/plugins/footnotes` are removed, other nodes are left as-is. */
-function footnote(node: ElementNode | CommentNode): Node | undefined {
+/** `sup.footnote-ref` / `section.footnotes` from `comark/plugins/footnotes` are removed, other nodes are unwrapped like their html counterparts. */
+function footnote(node: ElementNode | CommentNode): Node[] | undefined {
 	const cls = node[1].class
-	return cls === 'footnote-ref' || cls === 'footnotes' ? undefined : node
+	return cls === 'footnote-ref' || cls === 'footnotes' ? undefined : children(node)
 }
 
 function lineBreak(): Node {

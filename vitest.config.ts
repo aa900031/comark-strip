@@ -13,7 +13,13 @@ export default defineConfig({
 			junit: './reports/junit.xml',
 		},
 		projects: [
-			'./src',
+			{
+				test: {
+					name: 'source',
+					include: ['src/**/*.test.ts'],
+					benchmark: { include: [] },
+				},
+			},
 			{
 				plugins: isCI
 					? [

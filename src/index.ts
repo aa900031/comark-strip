@@ -1,7 +1,7 @@
 import type { MarkdownExitPlugin, Node } from 'comark'
 import type { Handler } from './handlers'
 import { defineComarkPlugin } from 'comark'
-import { children, createHandlers, empty, isElement } from './handlers'
+import { children, createHandlers, isElement } from './handlers'
 
 export type { Handler }
 
@@ -27,67 +27,77 @@ export default defineComarkPlugin<Options | null | undefined>((options) => {
 	const remove = options?.remove || []
 	const handlers = createHandlers(keep, remove)
 
-	// Block html and comments are dropped at token level: inline comments never
-	// become nodes (comark folds them into the surrounding text), and block html
-	// may leave trailing text as a separate node. Inline html then only needs `children`.
-	const stripHtml = handlers.html === children || handlers.html === empty
-	const stripComments = Object.hasOwn(handlers, 'html')
-	const processed = new WeakSet<object>()
+	// Unless `html` is kept, comments are dropped at token level: inline comments never
+	// become nodes (comark folds them into the surrounding text). With the default
+	// handler block html goes too, since it may leave trailing text as a separate node;
+	// inline html then only needs `children`.
+	const htmlStripped = Object.hasOwn(handlers, 'html')
+	const htmlDefault = handlers.html === children
+	// Children strip left in each element, to skip subtrees no later plugin touched.
+	const processed = new WeakMap<object, Node[]>()
+	let tomlOpen = false
 
-	function one(node: Node, parentSeen = false): Node | Node[] | undefined {
+	/** Strip `node` and push what remains of it onto `out`. */
+	function one(node: Node, out: Node[]): void {
 		const type = typeof node === 'string'
 			? 'text'
 			: node[0] === null || node[1].$?.html ? 'html' : node[0]
-		// Strings can't be tracked by identity; they inherit their parent's state.
-		const seen = typeof node === 'string' ? parentSeen : processed.has(node)
+		const seen = typeof node !== 'string' && processed.has(node)
 		if (seen && !dirty(node))
-			return node
-		let result: Node | Node[] | null | undefined = node
+			return push(out, node)
+		let result: Node | Node[] | null | undefined | void = node
 
 		const handler = Object.hasOwn(handlers, type) ? handlers[type] : undefined
 		if (handler && !seen)
-			result = handler(node) || undefined
+			result = handler(node)
 
-		if (!result || typeof result === 'string')
-			return result || undefined
+		if (!result)
+			return
+		if (typeof result === 'string')
+			return push(out, result)
+		if (!isElement(result)) {
+			for (const item of result)
+				one(item, out)
+			return
+		}
 
-		if (Array.isArray(result) && !isElement(result))
-			return all(result)
-
-		processed.add(result)
-		result.splice(2, result.length, ...all(result.slice(2) as Node[], seen))
+		// Strings can't be tracked by identity: those the previous pass left are matched
+		// by value so a `text` handler runs once per string.
+		const nodes = all(children(result), processed.get(result)?.filter(child => typeof child === 'string'))
+		result.splice(2, result.length, ...nodes)
+		processed.set(result, nodes)
 
 		// Drop paragraphs emptied by stripping — comark renders them as blank blocks,
 		// while strip-markdown's output never shows them.
 		if (result[0] === 'p' && result.length === 2)
-			return undefined
+			return
 
-		return result
+		push(out, result)
 	}
 
-	/** Does an already-processed subtree contain a node another plugin inserted since? */
+	/** Has an already-processed subtree changed since strip last saw it? */
 	function dirty(node: Node): boolean {
 		if (typeof node === 'string')
 			return false
-		if (!processed.has(node))
+		const previous = processed.get(node)
+		if (!previous || previous.length !== node.length - 2)
 			return true
-		for (let index = 2; index < node.length; index++) {
-			if (dirty(node[index] as Node))
-				return true
-		}
-		return false
+		return previous.some((child, index) => child !== node[index + 2] || dirty(child))
 	}
 
-	function all(nodes: Node[], parentSeen = false): Node[] {
+	function all(nodes: Node[], previousText: string[] = []): Node[] {
 		const result: Node[] = []
 		for (const node of nodes) {
-			const value = one(node, parentSeen)
-			if (Array.isArray(value) && !isElement(value))
-				result.push(...value)
-			else if (value)
-				result.push(value)
+			const previousIndex = typeof node === 'string' ? previousText.indexOf(node) : -1
+			if (previousIndex >= 0) {
+				previousText.splice(previousIndex, 1)
+				push(result, node)
+			}
+			else {
+				one(node, result)
+			}
 		}
-		return clean(result)
+		return result
 	}
 
 	return {
@@ -98,9 +108,9 @@ export default defineComarkPlugin<Options | null | undefined>((options) => {
 				md.core.ruler.push('strip-reference', (state) => {
 					state.tokens = state.tokens.filter(token => token.type !== 'reference')
 				})
-				if (stripComments) {
+				if (htmlStripped) {
 					md.core.ruler.push('strip-html', (state) => {
-						if (stripHtml)
+						if (htmlDefault)
 							state.tokens = state.tokens.filter(token => token.type !== 'html_block')
 						for (const token of state.tokens) {
 							if (token.type === 'inline' && token.children)
@@ -111,15 +121,17 @@ export default defineComarkPlugin<Options | null | undefined>((options) => {
 			}) satisfies MarkdownExitPlugin,
 		],
 		pre(state) {
-			// Skip when `toml` is kept/replaced, and in streaming re-parses, where
+			// Skip when `toml` is kept, and in streaming re-parses, where
 			// state.markdown is a mid-document suffix — a `+++` block there is content.
-			if (handlers.toml !== empty || state.parsedLines)
+			if (!Object.hasOwn(handlers, 'toml') || state.parsedLines)
 				return
 			const match = TOML_FRONTMATTER_RE.exec(state.markdown)
 			if (match) {
 				state.markdown = state.markdown.slice(match[0].length)
 				state.parsedLines = match[0].split('\n').length - 1
 			}
+			// An unclosed `+++` while streaming parses as paragraphs; see `post`.
+			tomlOpen = !match && /^\+\+\+[ \t]*\r?\n/.test(state.markdown)
 		},
 		post(state) {
 			// In streaming mode, reused nodes are already stripped, but other plugins' post
@@ -127,24 +139,30 @@ export default defineComarkPlugin<Options | null | undefined>((options) => {
 			// definition arrives). Revisit everything; `processed` keeps custom handlers, which
 			// may not be idempotent, from running twice on the same node, and `dirty` skips
 			// rebuilding subtrees nothing touched.
-			state.tree.nodes.splice(0, state.tree.nodes.length, ...all(state.tree.nodes))
-			if (handlers.yaml === empty)
+			// Root-level strings only come from block html (its trailing text); unless html
+			// is kept, drop them so a custom `html` handler behaves like the default.
+			state.tree.nodes = all(htmlStripped ? state.tree.nodes.filter(node => typeof node !== 'string') : state.tree.nodes)
+			if (tomlOpen) {
+				// Drop position meta so comark doesn't reuse these nodes and `pre` sees the
+				// document start again once the closing `+++` arrives.
+				for (const node of state.tree.nodes) {
+					if (typeof node !== 'string')
+						delete node[1].$
+				}
+			}
+			if (Object.hasOwn(handlers, 'yaml'))
 				state.tree.frontmatter = {}
 		},
 	}
 })
 
-/** Merge adjacent text nodes. */
-function clean(values: Node[]): Node[] {
-	const result: Node[] = []
-	for (const value of values) {
-		const previous = result.at(-1)
-		if (typeof value === 'string' && typeof previous === 'string')
-			result[result.length - 1] = previous + value
-		else
-			result.push(value)
-	}
-	return result
+/** Push, merging adjacent text nodes. */
+function push(nodes: Node[], value: Node): void {
+	const previous = nodes.at(-1)
+	if (typeof value === 'string' && typeof previous === 'string')
+		nodes[nodes.length - 1] = previous + value
+	else
+		nodes.push(value)
 }
 
 function isHtmlComment(token: { type: string, content?: string | null }): boolean {

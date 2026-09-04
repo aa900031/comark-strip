@@ -1,6 +1,7 @@
-import type { Node } from 'comark'
+import type { ComarkPlugin, MarkdownDocument, Node } from 'comark'
 import type { Handler, Options } from './index'
 import { createMarkdownParser, parseMarkdown } from 'comark'
+import alert from 'comark/plugins/alert'
 import footnotes from 'comark/plugins/footnotes'
 import { renderMarkdown } from 'comark/render'
 import { describe, expect, it } from 'vitest'
@@ -229,6 +230,16 @@ describe('strip', () => {
 		expect(await process('Alfred', { remove: [['text', () => 'Batman']] })).toBe('Batman')
 	})
 
+	it('should process text inserted into reused nodes', () => {
+		const plugin = strip({ remove: [['text', node => `[${node}]`]] })
+		const tree = { nodes: [['p', {}, 'old']] as Node[], frontmatter: {}, meta: {} }
+		const state = { tree, markdown: '', options: {}, tokens: [] }
+		plugin.post!(state)
+		;(tree.nodes[0] as Node[]).push('new')
+		plugin.post!(state)
+		expect(tree.nodes).toEqual([['p', {}, '[old][new]']])
+	})
+
 	it('should ignore non-function handlers', async () => {
 		// strip-markdown skips falsy handlers instead of crashing.
 		// @ts-expect-error -- falsy handler
@@ -247,8 +258,35 @@ describe('strip', () => {
 		expect(await process('+++ \ntitle = "Hello"\n+++ \n\nHello')).toBe('Hello')
 	})
 
-	it('should keep user nodes with footnote-like classes', async () => {
-		expect(await process('a :sup[1]{class="footnote-x"} b')).toContain('1')
+	it('should unwrap user nodes with footnote-like classes', async () => {
+		expect(await process('a :sup[1]{class="footnote-x"} b :sub[2] c')).toBe('a 1 b 2 c')
+	})
+
+	it('should remove frontmatter with a `remove` tuple', async () => {
+		expect(await process('---\ntitle: Hello\n---\n\nHello', { remove: [['yaml', () => undefined]] })).toBe('Hello')
+		expect(await process('+++\ntitle = "Hello"\n+++\n\nHello', { remove: [['toml', () => undefined]] })).toBe('Hello')
+	})
+
+	it('should remove TOML frontmatter containing blank lines when streaming', async () => {
+		const doc = await stream('+++\na = 1\n\n[s]\nb = 2\n+++\n\nHello\n\nWorld', 4)
+		// comark's stringifier prints streaming `$` meta, so compare node text instead.
+		expect(doc.nodes.map(node => node[2])).toEqual(['Hello', 'World'])
+	})
+
+	it('should drop text after block html with a custom `html` handler', async () => {
+		expect(await process('<div>inside</div>tail', { remove: [['html', () => undefined]] })).toBe('')
+	})
+
+	it('should not crash on task-list-item components without a checkbox', async () => {
+		expect(await process('a :li{class="task-list-item"} b')).toBe('a  b')
+	})
+
+	it('should accept duplicates in `keep`', async () => {
+		expect(await process('*x*', { keep: ['em', 'em'] })).toBe('*x*')
+	})
+
+	it('should support alerts registered before strip', async () => {
+		expect(await process('> [!NOTE]\n> hi', undefined, [alert()])).toBe('hi')
 	})
 
 	it('should not strip TOML-looking blocks mid-document when streaming', async () => {
@@ -260,18 +298,11 @@ describe('strip', () => {
 	})
 
 	it('should apply custom handlers once per node when streaming', async () => {
-		const parse = createMarkdownParser({
-			plugins: [strip({ remove: [['em', (node) => {
-				node[2] = `X${node[2]}`
-				return node
-			}]] })],
-		})
-		const full = 'aaa *bbb*\n\nccc *ddd*\n\neee *fff*\n'
-		let doc
-		for (let index = 8; index <= full.length; index += 8)
-			doc = await parse(full.slice(0, index), { streaming: true })
-		doc = await parse(full, { streaming: true })
-		expect(JSON.stringify(doc!.nodes)).not.toContain('XX')
+		const doc = await stream('aaa *bbb*\n\nccc *ddd*\n\neee *fff*\n', 8, { remove: [['em', (node) => {
+			node[2] = `X${node[2]}`
+			return node
+		}]] })
+		expect(JSON.stringify(doc.nodes)).not.toContain('XX')
 	})
 
 	it('should support callbacks in `remove`', async () => {
@@ -288,7 +319,15 @@ describe('strip', () => {
 	})
 })
 
-async function process(value: string, options?: Options): Promise<string> {
-	const doc = await parseMarkdown(value, { plugins: [footnotes(), strip(options)] })
+async function process(value: string, options?: Options, plugins: ComarkPlugin[] = [footnotes()]): Promise<string> {
+	const doc = await parseMarkdown(value, { plugins: [...plugins, strip(options)] })
 	return renderMarkdown(doc)
+}
+
+/** Parse `value` in `step`-sized streaming chunks, then once more in full. */
+async function stream(value: string, step: number, options?: Options): Promise<MarkdownDocument> {
+	const parse = createMarkdownParser({ plugins: [strip(options)] })
+	for (let index = step; index <= value.length; index += step)
+		await parse(value.slice(0, index), { streaming: true })
+	return parse(value, { streaming: true })
 }
