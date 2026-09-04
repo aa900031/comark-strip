@@ -179,6 +179,13 @@ describe('strip', () => {
 		expect(await process('Hello[^1]\n\n[^1]: World')).toBe('Hello')
 	})
 
+	it('should remove footnotes added after their references when streaming', async () => {
+		const parse = createMarkdownParser({ plugins: [footnotes(), strip()] })
+		await parse('Hello[^1]\n\nTail\n\n', { streaming: true })
+		const doc = await parse('Hello[^1]\n\nTail\n\n[^1]: World', { streaming: true })
+		expect(await renderMarkdown(doc)).not.toContain('footnote-ref')
+	})
+
 	it('should support `options.keep` (empty)', async () => {
 		expect(await process('- **Hello**\n\n- World!', { keep: [] })).toBe('Hello\n\nWorld!')
 	})

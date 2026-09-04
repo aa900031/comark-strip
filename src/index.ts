@@ -80,7 +80,6 @@ export default defineComarkPlugin<Options | null | undefined>((options) => {
 	}
 
 	let map = handlers
-
 	if (keep.length > 0) {
 		map = {}
 		for (const key in handlers) {
@@ -98,15 +97,20 @@ export default defineComarkPlugin<Options | null | undefined>((options) => {
 	// may leave trailing text as a separate node. Inline html then only needs `children`.
 	const stripHtml = map.html === children || map.html === empty
 	const stripComments = Object.hasOwn(map, 'html')
+	const processed = new WeakSet<object>()
 
-	function one(node: Node): Node | Node[] | undefined {
+	function one(node: Node, parentSeen = false): Node | Node[] | undefined {
 		const type = typeof node === 'string'
 			? 'text'
 			: node[0] === null || node[1].$?.html ? 'html' : node[0]
+		// Strings can't be tracked by identity; they inherit their parent's state.
+		const seen = typeof node === 'string' ? parentSeen : processed.has(node)
+		if (seen && !dirty(node))
+			return node
 		let result: Node | Node[] | null | undefined = node
 
 		const handler = Object.hasOwn(map, type) ? map[type] : undefined
-		if (handler)
+		if (handler && !seen)
 			result = handler(node) || undefined
 
 		if (!result || typeof result === 'string')
@@ -115,7 +119,8 @@ export default defineComarkPlugin<Options | null | undefined>((options) => {
 		if (Array.isArray(result) && !isElement(result))
 			return all(result)
 
-		result.splice(2, result.length, ...all(result.slice(2) as Node[]))
+		processed.add(result)
+		result.splice(2, result.length, ...all(result.slice(2) as Node[], seen))
 
 		// Drop paragraphs emptied by stripping — comark renders them as blank blocks,
 		// while strip-markdown's output never shows them.
@@ -125,10 +130,23 @@ export default defineComarkPlugin<Options | null | undefined>((options) => {
 		return result
 	}
 
-	function all(nodes: Node[]): Node[] {
+	/** Does an already-processed subtree contain a node another plugin inserted since? */
+	function dirty(node: Node): boolean {
+		if (typeof node === 'string')
+			return false
+		if (!processed.has(node))
+			return true
+		for (let index = 2; index < node.length; index++) {
+			if (dirty(node[index] as Node))
+				return true
+		}
+		return false
+	}
+
+	function all(nodes: Node[], parentSeen = false): Node[] {
 		const result: Node[] = []
 		for (const node of nodes) {
-			const value = one(node)
+			const value = one(node, parentSeen)
 			if (Array.isArray(value) && !isElement(value))
 				result.push(...value)
 			else if (value)
@@ -169,11 +187,12 @@ export default defineComarkPlugin<Options | null | undefined>((options) => {
 			}
 		},
 		post(state) {
-			// In streaming mode the first `reusableNodes.length` nodes are the previous
-			// parse's output, already stripped — re-running handlers on them would
-			// double-apply non-idempotent custom handlers (and is O(n²) over a stream).
-			const reused: number = state.reusableNodes?.length || 0
-			state.tree.nodes.splice(reused, state.tree.nodes.length, ...all(state.tree.nodes.slice(reused)))
+			// In streaming mode, reused nodes are already stripped, but other plugins' post
+			// hooks may have inserted nodes into them (footnotes replaces `[^1]` spans once the
+			// definition arrives). Revisit everything; `processed` keeps custom handlers, which
+			// may not be idempotent, from running twice on the same node, and `dirty` skips
+			// rebuilding subtrees nothing touched.
+			state.tree.nodes.splice(0, state.tree.nodes.length, ...all(state.tree.nodes))
 			if (map.yaml === empty)
 				state.tree.frontmatter = {}
 		},
