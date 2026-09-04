@@ -39,23 +39,27 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./reports/junit.xml
-  # benchmark-test:
-  #   runs-on: ubuntu-latest
-  #   permissions:
-  #     contents: read
-  #     id-token: write
-  #   steps:
-  #     - name: Checkout
-  #       uses: actions/checkout@v6
+  benchmark-test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
-  #     - name: Setup
-  #       uses: aa900031/github-actions/setup-node@main
+      - name: Setup
+        uses: aa900031/github-actions/setup-node@main
+        with:
+          no-turbo-cache: 'true'
 
-  #     - name: Run benchmark test
-  #       uses: CodSpeedHQ/action@v4
-  #       with:
-  #         mode: instrumentation
-  #         run: pnpm vitest bench
+      - name: Run benchmark test
+        uses: CodSpeedHQ/action@v4
+        with:
+          mode: instrumentation
+          run: pnpm run bench
   typecheck:
     runs-on: ubuntu-latest
     steps:
