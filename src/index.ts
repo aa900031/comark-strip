@@ -1,4 +1,4 @@
-import type { CommentNode, ElementNode, Node } from 'comark'
+import type { CommentNode, ElementNode, MarkdownExitPlugin, Node } from 'comark'
 import { defineComarkPlugin } from 'comark'
 
 /**
@@ -41,10 +41,9 @@ const defaults: Handlers = {
 	h5: paragraph,
 	h6: paragraph,
 	hr: empty,
-	html,
+	html: children,
 	img: image,
-	input: taskInput,
-	li: block,
+	li: listItem,
 	ol: children,
 	p: paragraph,
 	pre: empty,
@@ -71,15 +70,11 @@ export default defineComarkPlugin<Options | null | undefined>((options) => {
 	const remove = options?.remove || []
 	const handlers: Handlers = { ...defaults }
 
-	// A kept `li` still needs its internal checkbox for Comark's list renderer.
-	if (keep.includes('li'))
-		handlers.input = node => node
-
 	for (const value of remove) {
 		if (typeof value === 'string')
 			// `remove: ['html']` mirrors strip-markdown, where it equals the default
 			// (mdast html nodes are tag-only markers, so inline text always survives).
-			handlers[value] = value === 'html' ? html : empty
+			handlers[value] = value === 'html' ? children : empty
 		else
 			handlers[value[0]] = value[1]
 	}
@@ -98,9 +93,10 @@ export default defineComarkPlugin<Options | null | undefined>((options) => {
 		}
 	}
 
-	const stripHtml = map.html === html || map.html === empty
-	// Inline comments never become nodes (comark folds them into the surrounding
-	// text), so they must be dropped at token level whenever `html` is not kept.
+	// Block html and comments are dropped at token level: inline comments never
+	// become nodes (comark folds them into the surrounding text), and block html
+	// may leave trailing text as a separate node. Inline html then only needs `children`.
+	const stripHtml = map.html === children || map.html === empty
 	const stripComments = Object.hasOwn(map, 'html')
 
 	function one(node: Node): Node | Node[] | undefined {
@@ -109,11 +105,9 @@ export default defineComarkPlugin<Options | null | undefined>((options) => {
 			: node[0] === null || node[1].$?.html ? 'html' : node[0]
 		let result: Node | Node[] | null | undefined = node
 
-		if (Object.hasOwn(map, type)) {
-			const handler = map[type]
-			if (handler)
-				result = handler(node) || undefined
-		}
+		const handler = Object.hasOwn(map, type) ? map[type] : undefined
+		if (handler)
+			result = handler(node) || undefined
 
 		if (!result || typeof result === 'string')
 			return result || undefined
@@ -133,15 +127,12 @@ export default defineComarkPlugin<Options | null | undefined>((options) => {
 
 	function all(nodes: Node[]): Node[] {
 		const result: Node[] = []
-		for (let index = 0; index < nodes.length; index++) {
-			const node = nodes[index]!
+		for (const node of nodes) {
 			const value = one(node)
 			if (Array.isArray(value) && !isElement(value))
 				result.push(...value)
 			else if (value)
 				result.push(value)
-			else if (isTaskInput(node) && typeof nodes[index + 1] === 'string')
-				nodes[index + 1] = (nodes[index + 1] as string).replace(/^ /, '')
 		}
 		return clean(result)
 	}
@@ -149,22 +140,22 @@ export default defineComarkPlugin<Options | null | undefined>((options) => {
 	return {
 		name: 'strip',
 		markdownItPlugins: [
-			(md) => {
+			((md) => {
 				// Link reference definitions produce an empty `component` node in comark; drop them.
-				md.core.ruler.push('strip-reference', (state: any) => {
-					state.tokens = state.tokens.filter((token: any) => token.type !== 'reference')
+				md.core.ruler.push('strip-reference', (state) => {
+					state.tokens = state.tokens.filter(token => token.type !== 'reference')
 				})
-				if (stripHtml || stripComments) {
-					md.core.ruler.push('strip-html', (state: any) => {
+				if (stripComments) {
+					md.core.ruler.push('strip-html', (state) => {
 						if (stripHtml)
-							state.tokens = state.tokens.filter((token: any) => token.type !== 'html_block')
+							state.tokens = state.tokens.filter(token => token.type !== 'html_block')
 						for (const token of state.tokens) {
 							if (token.type === 'inline' && token.children)
-								token.children = token.children.filter((token: any) => !isHtmlComment(token))
+								token.children = token.children.filter(token => !isHtmlComment(token))
 						}
 					})
 				}
-			},
+			}) satisfies MarkdownExitPlugin,
 		],
 		pre(state) {
 			// Skip when `toml` is kept/replaced, and in streaming re-parses, where
@@ -174,7 +165,7 @@ export default defineComarkPlugin<Options | null | undefined>((options) => {
 			const match = TOML_FRONTMATTER_RE.exec(state.markdown)
 			if (match) {
 				state.markdown = state.markdown.slice(match[0].length)
-				state.parsedLines = (state.parsedLines || 0) + match[0].split(/\r?\n/).length - 1
+				state.parsedLines = match[0].split('\n').length - 1
 			}
 		},
 		post(state) {
@@ -182,9 +173,7 @@ export default defineComarkPlugin<Options | null | undefined>((options) => {
 			// parse's output, already stripped — re-running handlers on them would
 			// double-apply non-idempotent custom handlers (and is O(n²) over a stream).
 			const reused: number = state.reusableNodes?.length || 0
-			state.tree.nodes = reused > 0
-				? [...state.tree.nodes.slice(0, reused), ...all(state.tree.nodes.slice(reused))]
-				: all(state.tree.nodes)
+			state.tree.nodes.splice(reused, state.tree.nodes.length, ...all(state.tree.nodes.slice(reused)))
 			if (map.yaml === empty)
 				state.tree.frontmatter = {}
 		},
@@ -232,24 +221,22 @@ function image(node: ElementNode | CommentNode): Node | undefined {
 	return value || undefined
 }
 
-function taskInput(node: ElementNode | CommentNode): Node | undefined {
-	return isTaskInput(node) ? undefined : node
+/** Like comark's own `li` renderer, drop the checkbox of a `task-list-item` (and the space after it). */
+function listItem(node: ElementNode | CommentNode): Node[] | ElementNode {
+	if (String(node[1].class || '').includes('task-list-item')) {
+		const first = node[2]
+		const host = isElement(first) && first[0] === 'p' ? first : node
+		if (isElement(host[2]) && host[2][0] === 'input') {
+			host.splice(2, 1)
+			if (typeof host[2] === 'string')
+				host[2] = (host[2] as string).replace(/^ /, '')
+		}
+	}
+	return block(node)
 }
 
-function isTaskInput(node: Node): node is ElementNode {
-	return Array.isArray(node)
-		&& node[0] === 'input'
-		&& node[1].class === 'task-list-item-checkbox'
-		&& node[1].type === 'checkbox'
-}
-
-function isHtmlComment(token: { type: string, content?: string }): boolean {
+function isHtmlComment(token: { type: string, content?: string | null }): boolean {
 	return token.type === 'html_inline' && HTML_COMMENT_RE.test(token.content?.trim() || '')
-}
-
-/** Inline html keeps its text, block html (and comments) is removed. */
-function html(node: ElementNode | CommentNode): Node[] | undefined {
-	return node[0] === null || node[1].$?.block ? undefined : children(node)
 }
 
 /** `sup.footnote-ref` / `section.footnotes` from `comark/plugins/footnotes` are removed, other nodes are left as-is. */

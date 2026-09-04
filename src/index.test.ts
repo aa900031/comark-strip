@@ -18,8 +18,7 @@ describe('strip', () => {
 			meta: {},
 		}
 		strip().post!({
-			// eslint-disable-next-line ts/ban-ts-comment
-			// @ts-expect-error
+			// @ts-expect-error -- partial state
 			tree,
 			markdown: '',
 			options: {},
@@ -140,6 +139,10 @@ describe('strip', () => {
 		expect(await process('- [ ] todo\n- [x] done')).toBe('todo\n\ndone')
 	})
 
+	it('should remove task list checkboxes from items with block content', async () => {
+		expect(await process('- [ ] todo\n\n  more\n- [x] done')).toBe('todo\n\nmore\n\ndone')
+	})
+
 	it('should support code (indented)', async () => {
 		expect(await process('\talert("hello");')).toBe('')
 	})
@@ -221,8 +224,7 @@ describe('strip', () => {
 
 	it('should ignore non-function handlers', async () => {
 		// strip-markdown skips falsy handlers instead of crashing.
-		// eslint-disable-next-line ts/ban-ts-comment
-		// @ts-expect-error
+		// @ts-expect-error -- falsy handler
 		expect(await process('*x*', { remove: [['em', undefined]] })).toBe('*x*')
 	})
 
