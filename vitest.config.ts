@@ -1,4 +1,5 @@
 import { getV8Flags } from '@codspeed/core'
+import codspeed from '@codspeed/vitest-plugin'
 import { isCI } from 'std-env'
 import { defineConfig } from 'vitest/config'
 

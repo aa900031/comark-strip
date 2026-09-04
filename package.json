@@ -33,7 +33,7 @@
 		"lint": "eslint .",
 		"test": "vitest run",
 		"bench": "vitest bench --run",
-		"typecheck": "tsc -b"
+		"typecheck": "tsc -p ./tsconfig.app.json"
 	},
 	"peerDependencies": {
 		"comark": ">=0.6.0"
