@@ -2,7 +2,7 @@
 	"name": "comark-strip",
 	"type": "module",
 	"version": "0.1.0",
-	"packageManager": "pnpm@11.24.0",
+	"packageManager": "pnpm@12.3.4",
 	"author": "zhong666 <hi@zhong666.me>",
 	"license": "MIT",
 	"repository": {
