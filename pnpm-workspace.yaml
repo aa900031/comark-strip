@@ -5,3 +5,4 @@ strictPeerDependencies: false
 trustPolicy: no-downgrade
 trustPolicyIgnoreAfter: 43200
 autoInstallPeers: false
+pmOnFail: ignore
