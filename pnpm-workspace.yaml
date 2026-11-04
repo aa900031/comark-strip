@@ -1,8 +1,9 @@
 ignoreWorkspaceRootCheck: true
-shamefullyHoist: true
-shellEmulator: true
-strictPeerDependencies: false
+minimumReleaseAgeExcludePrune: true
 trustPolicy: no-downgrade
 trustPolicyIgnoreAfter: 43200
 autoInstallPeers: false
+strictPeerDependencies: false
+shamefullyHoist: true
+shellEmulator: true
 pmOnFail: ignore
