@@ -20,9 +20,9 @@ importers:
       '@codspeed/vitest-plugin':
         specifier: ^5.7.1
         version: 5.7.1(debug@4.4.3(supports-color@7.2.0))(supports-color@7.2.0)(tinybench@2.9.0)(vitest@4.1.12)
-      '@tsconfig/node24':
-        specifier: ^24.0.5
-        version: 24.0.5
+      '@tsconfig/node26':
+        specifier: ^26.0.0
+        version: 26.0.2
       '@types/node':
         specifier: ^24.19.2
         version: 24.19.2
@@ -702,8 +702,8 @@ packages:
     peerDependencies:
       eslint: ^9.0.0 || ^10.0.0
 
-  '@tsconfig/node24@24.0.5':
-    resolution: {integrity: sha512-DWC54fGPuhZgg3Ighg4Y/A/bA3ZdB5hnzAuv/MkQ/X85sVsBsMQxu8t7khutdYeiNksBbFdDyeqv1HSW2Zl8aA==}
+  '@tsconfig/node26@26.0.2':
+    resolution: {integrity: sha512-RIBSoNGQxUQ8r4hSrEzS6TrUneoKaCuX6BjL4zF3wqttGq2w06zCea4d8P1gRvM/HZyDT1FQJ8trZSyy/63oMg==}
 
   '@types/chai@5.2.3':
     resolution: {integrity: sha512-Mw558oeA9fFbv65/y4mHtXDs9bPnFMZAL/jxdPFUpOHHIXX91mcgEHbS5Lahr+pwZFR8A7GQleRWeI6cGFC2UA==}
@@ -3069,18 +3069,22 @@ packages:
   yuku-ast@0.19.0:
     resolution: {integrity: sha512-PyCsiScaelhxBGzL8dyeJkLqvRZycoh78R31Vrt/WqYrm0hMFoKwIw/X7Dx5mBKLWAMlV9I9HEyBOHnj2gZVyw==}
     engines: {node: '>=14.18.0'}
+    deprecated: 'Yuku is now one package with one core. Use "yuku" instead: https://yuku.fyi/javascript/. Existing installs keep working but get no more fixes.'
 
   yuku-codegen@0.19.0:
     resolution: {integrity: sha512-uymAKHjDuaP4BEpkXC/BSLz4DUEF5oArZ5AuD3888nb2miChjWSgpPdojEJxm3pjpXkgUaCRJQyNAbnMN33wHg==}
     engines: {node: '>=14.18.0'}
+    deprecated: 'Yuku is now one package with one core. Use "yuku" instead: https://yuku.fyi/javascript/. Existing installs keep working but get no more fixes.'
 
   yuku-core@0.19.0:
     resolution: {integrity: sha512-kYK9e1XdfirNhkipzW0wmMcSWcVF/CWnuugodfVYRCUwvoBefweL9HzB96OiKEhsx78V5WbUxbJqlizMX869Qg==}
     engines: {node: '>=14.18.0'}
+    deprecated: 'Yuku is now one package with one core. Use "yuku" instead: https://yuku.fyi/javascript/. Existing installs keep working but get no more fixes.'
 
   yuku-parser@0.19.0:
     resolution: {integrity: sha512-XrBh9ZiQK5mJVRxZBAvD6LwRyAYrK3MFtH3+onyuxFL5hFD44EC3QOmIC1FjTj6H2MMwq46/NAI+NZxLZPZgxg==}
     engines: {node: '>=14.18.0'}
+    deprecated: 'Yuku is now one package with one core. Use "yuku" instead: https://yuku.fyi/javascript/. Existing installs keep working but get no more fixes.'
 
   zwitch@2.0.4:
     resolution: {integrity: sha512-bXE4cR/kVZhKZX/RjPEflHaKVhUVl85noU3v6b8apfQEc1x4A+zBxjZ4lN8LqGd6WZ3dl98pY4o717VFmoPp+A==}
@@ -3772,7 +3776,7 @@ snapshots:
       estraverse: 5.3.0
       picomatch: 4.0.7
 
-  '@tsconfig/node24@24.0.5': {}
+  '@tsconfig/node26@26.0.2': {}
 
   '@types/chai@5.2.3':
     dependencies:
